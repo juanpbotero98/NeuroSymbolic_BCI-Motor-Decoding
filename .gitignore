@@ -1,0 +1,13 @@
+*.o
+*.pyc
+*.npz
+*.zip
+*.pkl
+*.h5
+*.tar.zip
+*.tar.gz
+*.tar.bz2
+*.pt
+*.pth
+*.ipynb_checkpoint
+Dataset/*
