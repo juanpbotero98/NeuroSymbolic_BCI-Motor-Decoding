@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 from scipy.special import legendre
 import h5py
-
-
+import matplotlib.patches as mpatches
+import torch
+from sklearn.metrics import accuracy_score, classification_report
 
 # ------------ Data Handling Functions -------------- #
 def get_data(inputfile):
@@ -139,7 +140,7 @@ def get_vel_data(inputfile):
 
     return curs_vel_list, spike_list
 
-def get_data_BIOCAS(inputfile):
+def get_data_BIOCAS(inputfile, discretize_output=False):
     # Load and unpack mat file
     data = h5py.File(inputfile,'r')
     cursor_pos = data['cursor_pos'][:]
@@ -156,9 +157,6 @@ def get_data_BIOCAS(inputfile):
     curs_inter = np.array([interpolate_position(cursor_pos[i],time_ms,exp_length) for i in range(len(cursor_pos))])
     
     # Normalize the cursor position
-    # TODO: Normalization not working...
-    # curs_inter[0,:] = curs_inter[0,:] - np.min(curs_inter[0,:]) / (np.max(curs_inter[0,:]) - np.min(curs_inter[0,:]))
-    # curs_inter[1,:] = curs_inter[1,:] - np.min(curs_inter[1,:]) / (np.max(curs_inter[1,:]) - np.min(curs_inter[1,:])) 
     curs_norm = normalize_to_range(curs_inter,new_min=-1,new_max=1,axis=1)
     
     # Load spike data
@@ -198,11 +196,56 @@ def get_data_BIOCAS(inputfile):
             spike_data[i, :] = s.todense()
 
     # Calculate the velocity
-    #Get the raw speed 
-    vel_data= np.gradient(cur_data[0])**2+ np.gradient(cur_data[1])**2
-    
+    #Get the raw speed
+    pos_diff = np.diff(curs_norm,axis=1)
+    vel_data = pos_diff/dt # pixels per second
+    # Prepend zero velocity to match the length of the spike data
+    vel_data = np.hstack((np.zeros((2,1)),vel_data))
+
+    if discretize_output:
+        vel_data = discretize_velocity(vel_data)
+
     return curs_norm, spike_data, vel_data
 
+def discretize_velocity(vel_data, vel_tresh=0.81, moving_thresh=0.03): # Thresholds set by 25th and 75th percentile
+    # Discretize the velocity data
+    # calculate the magnitude and direction of the velocity
+    vel_mag = np.linalg.norm(vel_data,axis=0)
+    vel_dir = np.arctan2(vel_data[1],vel_data[0])
+
+    # # Create empty array to store discretized labels
+    # # 8 directions, 2 speeds + 1 stationary   
+    # vel_data = np.zeros((17,np.shape(vel_data)[1]))
+    vel_discrete = []
+
+    # Discretize the velocity data
+    bins2vect_mapping = {'0-0': 1, '0-1': 2, '45-0':3 , '45-1':4, 
+                        '90-0':5, '90-1':6, '135-0':7, '135-1':8, 
+                        '180-0':9, '180-1':10, '225-0':11, '225-1':12,
+                        '270-0':13, '270-1':14, '315-0':15, '315-1':16}
+    
+    for mag,dir in zip(vel_mag,vel_dir):
+        if mag < moving_thresh:
+            # If the magnitude of the velocity is less than the moving threshold, the cursor is considered stationary
+            # and the direction is not relevant
+            label = 0 # Stationary
+            vel_discrete.append(label)
+        
+        else:
+            # Dicretize the direction (8 bins, each 45 degrees)
+            dir_deg = np.rad2deg(dir)
+            if dir_deg < 0:
+                dir_deg += 360
+            direction_bin = int(np.floor(dir_deg/45))*45
+
+            # Discretize the speed (2 bins, 0 or 1)
+            veolicty_bin = 1 if mag>= vel_tresh else 0
+
+            # Create label vector
+            label_idx = bins2vect_mapping[f'{direction_bin}-{veolicty_bin}']
+            vel_discrete.append(label_idx)
+    return np.array(vel_discrete)
+        
 
 def split_data(input, startTime, endTime, dt):
     """
@@ -278,19 +321,19 @@ def calculate_derivative(data, dx):
     return derivative
 
 
-def evaluate_features(train_X, train_Y, test_X, test_Y, **kwargs):
-    if "models" in kwargs:
-        models = kwargs["models"]
-    else:
-        models = [Naive_model]
-    if "regs" in kwargs:
-        regs = kwargs["regs"]
-    else:
-        regs = [0.1]  # Best reg of default model
-    if "taus" in kwargs:
-        taus = kwargs["taus"]
-    else:
-        taus = [0.7]  # Best tau in Naive model
+# def evaluate_features(train_X, train_Y, test_X, test_Y, **kwargs):
+#     if "models" in kwargs:
+#         models = kwargs["models"]
+#     else:
+#         models = [Naive_model]
+#     if "regs" in kwargs:
+#         regs = kwargs["regs"]
+#     else:
+#         regs = [0.1]  # Best reg of default model
+#     if "taus" in kwargs:
+#         taus = kwargs["taus"]
+#     else:
+#         taus = [0.7]  # Best tau in Naive model
 
 
 def normalize_to_range(matrix, new_min, new_max, axis=0):
@@ -324,6 +367,39 @@ def compute_correlation_matrix(projected_data, cursor_data):
     plt.show()
     return correlation_matrix
 
+def evaluate_classification_model(model, data_loader, device):
+    model.eval()
+    all_targets = []
+    all_predictions = []
+    with torch.no_grad():
+        for inputs, targets in data_loader:
+            batch_size, seq_len, _ = inputs.size()
+            inputs, targets = inputs.to(device), targets.to(device)
+            
+            # Initialize hidden state
+            hidden = model.init_hidden(batch_size).to(device)
+            
+            # Process each time step
+            for t in range(seq_len):
+                input_t = inputs[:, t, :]
+                output_t, hidden = model(input_t, hidden)
+            
+            # Get the predictions for the final time step in the sequence
+            _, predicted = torch.max(output_t, 1)
+            all_predictions.extend(predicted.cpu().numpy())
+            all_targets.extend(targets.cpu().numpy())
+    
+    # Compute accuracy and detailed classification report
+    accuracy = accuracy_score(all_targets, all_predictions)
+    report = classification_report(all_targets, all_predictions, zero_division=0)
+
+    # TODO: Calculate the trayectory given the discretized velocity and direction joint labels
+    # Class 0: stationary, Class 1: 45 deg 1 pixel, Class 2: 45 deg 2 pixels, ..., Class 16: 315 deg 2 pixels
+    # test_init_idx = np.shape(cur_pos)[1]//2
+    # innitial_pos = cur_pos[:,test_init_idx]
+    
+    return accuracy, report
+
 # ------------ Plotting Functions -------------- #
 def pred_vs_gt_plot(predictions, ground_truth, r_squared, title=''): #predictions [N,2], ground_truth [N,2]
     ## Plot predictions against actual
@@ -349,6 +425,40 @@ def pred_vs_gt_plot(predictions, ground_truth, r_squared, title=''): #prediction
     plt.title('Y values')
     plt.annotate(f"Test R2: {'{:.2f}'.format(r_squared)}", (150,150))
     plt.tight_layout()
+
+def determine_velocity_thresholds_and_plot(velocity_magnitudes, stationary_percentile=25, slow_fast_percentile=75):
+    # Calculate the thresholds based on specified percentiles
+    stationary_threshold = np.percentile(velocity_magnitudes, stationary_percentile)
+    slow_fast_threshold = np.percentile(velocity_magnitudes, slow_fast_percentile)
+    
+    # Create histogram data
+    counts, bins = np.histogram(velocity_magnitudes, bins=50)
+    
+    # Plot histogram with colored bars
+    plt.figure(figsize=(10, 6))
+    for i in range(len(bins) - 1):
+        if bins[i] <= stationary_threshold:
+            color = 'red'      # Stationary
+        elif bins[i] <= slow_fast_threshold:
+            color = 'blue'     # Slow
+        else:
+            color = 'orange'   # Fast
+        plt.bar(bins[i], counts[i], width=bins[i+1] - bins[i], color=color, align='edge')
+
+    # Labels and title
+    plt.title("Velocity Magnitude Histogram with Thresholds")
+    plt.xlabel("Velocity Magnitude")
+    plt.ylabel("Frequency")
+    
+    # Add legend for color codes
+    red_patch = mpatches.Patch(color='red', label='Stationary')
+    blue_patch = mpatches.Patch(color='blue', label='Slow')
+    orange_patch = mpatches.Patch(color='orange', label='Fast')
+    plt.legend(handles=[red_patch, blue_patch, orange_patch])
+
+    plt.show()
+    
+    return stationary_threshold, slow_fast_threshold
 
 
 # ------------ Helper Classes -------------- #
@@ -396,8 +506,8 @@ if __name__ == "__main__":
     # curs_list, spike_list, targetind = get_data(inputfile)
 
     # Test BIOCAS data loading function
-    inputfile = "Code V2\\Dataset\\NHP Reaching Sensorimotor Ephys\\indy_20160407_02.mat"
-    cursor_pos, spike_data = get_data_BIOCAS(inputfile)
+    inputfile = "Dataset\\NHP Reaching Sensorimotor Ephys\\indy_20160407_02.mat"
+    cursor_pos, spike_data, vel = get_data_BIOCAS(inputfile, discretize_output=True)
 
     print("Data loaded successfully!")
     
