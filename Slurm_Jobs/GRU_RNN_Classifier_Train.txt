@@ -1,0 +1,2 @@
+#SBATCH --account=solzbacher
+#SBATCH --partition=notchpeak-freecycle
