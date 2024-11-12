@@ -11,3 +11,4 @@
 *.pth
 *.ipynb_checkpoint
 Dataset/*
+Dataset
