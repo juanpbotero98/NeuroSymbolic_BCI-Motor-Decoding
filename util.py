@@ -367,7 +367,7 @@ def compute_correlation_matrix(projected_data, cursor_data):
     plt.show()
     return correlation_matrix
 
-def evaluate_classification_model(model, data_loader, device):
+def evaluate_classification_model(model, data_loader, device, test_curs_pos):
     model.eval()
     all_targets = []
     all_predictions = []
@@ -397,8 +397,24 @@ def evaluate_classification_model(model, data_loader, device):
     # Class 0: stationary, Class 1: 45 deg 1 pixel, Class 2: 45 deg 2 pixels, ..., Class 16: 315 deg 2 pixels
     # test_init_idx = np.shape(cur_pos)[1]//2
     # innitial_pos = cur_pos[:,test_init_idx]
+
+    # Calculate the trayectory
+    trayectory = np.zeros((2,len(all_predictions)))
+    trayectory[:,0] = test_curs_pos[:,0] # Initial position
+    for i in range(1,len(all_predictions)):
+        label = all_predictions[i]
+        direction = (label-1)//2 * 45
+        speed = 1 if (label-1)%2 == 0 else 2 
+        if label == 0:
+            trayectory[:,i] = trayectory[:,i-1]
+        else:
+            trayectory[:,i] = trayectory[:,i-1] + speed*np.array([np.cos(np.deg2rad(direction)),np.sin(np.deg2rad(direction))])
+
+    # Calculate the trajectory R2 score
+    r = np.corrcoef(trayectory,test_curs_pos)
+    r_squared = r[0,1]**2
     
-    return accuracy, report
+    return accuracy, report, trayectory, r_squared
 
 # ------------ Plotting Functions -------------- #
 def pred_vs_gt_plot(predictions, ground_truth, r_squared, title=''): #predictions [N,2], ground_truth [N,2]
