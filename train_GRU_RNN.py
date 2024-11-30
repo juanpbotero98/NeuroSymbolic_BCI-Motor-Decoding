@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 import argparse
 import datetime
 
-def main(epochs= 10, model_path=None, log_dir=None):
+def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
     # Configuration
     input_size = 192 # Electrodes
     output_size = 2 # X and Y velocity
@@ -27,7 +27,7 @@ def main(epochs= 10, model_path=None, log_dir=None):
 
     # Model ID = {date}-GRU-regressor-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}
     date = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_id = f"{date}-GRU-regressor-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}-{epochs}epochs"
+    model_id = f"{date}-GRU_regressor_{objective}-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}-{epochs}epochs"
     log_dir = f"./Training_logs/{model_id}"
     os.makedirs(log_dir, exist_ok=True)
 
@@ -67,15 +67,31 @@ def main(epochs= 10, model_path=None, log_dir=None):
     synapse = nengo.synapses.Lowpass(tau=0.7) # tau is taken from Naive model (L2 reg linear regression) optimal value 
     FR = synapse.filt(spike_data)
 
-    # Split dataset 
-    train_FR, test_FR, train_vel, test_vel = train_test_split(FR.T, cur_vel.T, test_size=0.5,shuffle=False) # 50% train, 50% test
-    val_FR, train_FR, val_cursor, train_vel = train_test_split(train_FR, train_vel, test_size=0.75,shuffle=False) # 25% val, 75% train
-    train_FR_tensor = torch.tensor(train_FR.T, dtype=torch.float32).to(device)
-    train_vel_tensor = torch.tensor(train_vel.T, dtype=torch.float32).to(device)
+    # Split dataset
+    if objective == 'pos':
+        # Split dataset
+        train_FR, test_FR, train_pos, test_pos = train_test_split(FR.T, cur_pos.T, test_size=0.5,shuffle=False)
+        val_FR, train_FR, val_pos, train_pos = train_test_split(train_FR, train_pos, test_size=0.75,shuffle=False)
+        # Convert to PyTorch tensors
+        train_FR_tensor = torch.tensor(train_FR.T, dtype=torch.float32).to(device)
+        train_pos_tensor = torch.tensor(train_pos.T, dtype=torch.float32).to(device)
+        # Define data loaders
+        train_data = Batch_Dataset(train_FR_tensor, train_pos_tensor, seq_len)
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    
+    elif objective == 'vel':
+        # Split dataset
+        train_FR, test_FR, train_vel, test_vel = train_test_split(FR.T, cur_vel.T, test_size=0.5,shuffle=False) # 50% train, 50% test
+        val_FR, train_FR, val_cursor, train_vel = train_test_split(train_FR, train_vel, test_size=0.75,shuffle=False) # 25% val, 75% train
+        # Convert to PyTorch tensors
+        train_FR_tensor = torch.tensor(train_FR.T, dtype=torch.float32).to(device)
+        train_vel_tensor = torch.tensor(train_vel.T, dtype=torch.float32).to(device)
+        # Define data loaders
+        train_data = Batch_Dataset(train_FR_tensor, train_vel_tensor, seq_len)
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
 
-    train_data = Batch_Dataset(train_FR_tensor, train_vel_tensor, seq_len)
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-
+    else:
+        raise ValueError("Objective must be either 'position' or 'velocity'")
 
     # Training loop
     for epoch in range(epochs-start_epoch):
@@ -138,6 +154,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, default=None, help="Path to model checkpoint")
     parser.add_argument("--epochs", type=int, default=15, help="Number of epochs to train")
+    parser.add_argument("--objective", type=str, default='pos', help="Objective to train the model on: 'pos' or 'vel'")
     args = parser.parse_args()
 
     # Run training loop

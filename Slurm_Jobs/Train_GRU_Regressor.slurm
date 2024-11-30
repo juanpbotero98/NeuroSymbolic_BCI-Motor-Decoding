@@ -16,4 +16,4 @@ conda init
 conda activate Neurosymbolic
 
 # run training script
-python train_GRU_RNN.py --epochs 15
+python train_GRU_RNN.py --epochs 15 --objective 'pos'
