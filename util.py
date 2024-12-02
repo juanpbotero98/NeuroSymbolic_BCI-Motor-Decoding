@@ -12,6 +12,7 @@ import h5py
 import matplotlib.patches as mpatches
 import torch
 from sklearn.metrics import accuracy_score, classification_report
+import tqdm
 
 # ------------ Data Handling Functions -------------- #
 def get_data(inputfile):
@@ -372,7 +373,7 @@ def evaluate_classification_model(model, data_loader, device, test_curs_pos):
     all_targets = []
     all_predictions = []
     with torch.no_grad():
-        for inputs, targets in data_loader:
+        for batch_id, (inputs, targets) in tqdm.tqdm(enumerate(data_loader)):
             batch_size, seq_len, _ = inputs.size()
             inputs, targets = inputs.to(device), targets.to(device)
             
@@ -384,35 +385,35 @@ def evaluate_classification_model(model, data_loader, device, test_curs_pos):
                 input_t = inputs[:, t, :]
                 output_t, hidden = model(input_t, hidden)
             
-            # Get the predictions for the final time step in the sequence
+            # Get the predictions and targets for the final time step in the sequence
             _, predicted = torch.max(output_t, 1)
             all_predictions.extend(predicted.cpu().numpy())
-            all_targets.extend(targets.cpu().numpy())
+            all_targets.extend(targets[:, -1].cpu().numpy())
     
     # Compute accuracy and detailed classification report
     accuracy = accuracy_score(all_targets, all_predictions)
     report = classification_report(all_targets, all_predictions, zero_division=0)
 
-    # TODO: Calculate the trayectory given the discretized velocity and direction joint labels
     # Class 0: stationary, Class 1: 45 deg 1 pixel, Class 2: 45 deg 2 pixels, ..., Class 16: 315 deg 2 pixels
     # test_init_idx = np.shape(cur_pos)[1]//2
     # innitial_pos = cur_pos[:,test_init_idx]
 
     # Calculate the trayectory
-    trayectory = np.zeros((2,len(all_predictions)))
+    trayectory = np.zeros((2,len(all_predictions))).T
     trayectory[:,0] = test_curs_pos[:,0] # Initial position
     for i in range(1,len(all_predictions)):
         label = all_predictions[i]
         direction = (label-1)//2 * 45
         speed = 1 if (label-1)%2 == 0 else 2 
         if label == 0:
-            trayectory[:,i] = trayectory[:,i-1]
+            trayectory[i,:] = trayectory[i-1,:]
         else:
-            trayectory[:,i] = trayectory[:,i-1] + speed*np.array([np.cos(np.deg2rad(direction)),np.sin(np.deg2rad(direction))])
+            trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction)),np.sin(np.deg2rad(direction))]).T
 
     # Calculate the trajectory R2 score
-    r = np.corrcoef(trayectory,test_curs_pos)
-    r_squared = r[0,1]**2
+    ss_res = np.sum((trayectory - test_curs_pos) ** 2)  # Residual sum of squares
+    ss_tot = np.sum((trayectory - np.mean(trayectory)) ** 2)  # Total sum of squares
+    r_squared = 1 - (ss_res / ss_tot)
     
     return accuracy, report, trayectory, r_squared
 
