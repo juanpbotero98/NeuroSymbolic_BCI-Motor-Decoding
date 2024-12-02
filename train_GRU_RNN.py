@@ -27,8 +27,9 @@ def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
 
     # Model ID = {date}-GRU-regressor-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}
     date = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_id = f"{date}-GRU_regressor_{objective}-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}-{epochs}epochs"
-    log_dir = f"./Training_logs/{model_id}"
+    if log_dir is None:
+        model_id = f"{date}-GRU_regressor_{objective}-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}-{epochs}epochs"
+        log_dir = f"./Training_logs/{model_id}"
     os.makedirs(log_dir, exist_ok=True)
 
     # Initialize TensorBoard SummaryWriter
@@ -155,7 +156,8 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", type=str, default=None, help="Path to model checkpoint")
     parser.add_argument("--epochs", type=int, default=15, help="Number of epochs to train")
     parser.add_argument("--objective", type=str, default='pos', help="Objective to train the model on: 'pos' or 'vel'")
+    parser.add_argument("--log_dir", type=str, default=None, help="Directory to save TensorBoard logs")
     args = parser.parse_args()
 
     # Run training loop
-    main(epochs=args.epochs, model_path=args.model_path)
+    main(epochs=args.epochs, model_path=args.model_path, log_dir=args.log_dir, objective=args.objective)
