@@ -396,26 +396,69 @@ def evaluate_classification_model(model, data_loader, device, test_curs_pos):
 
     # Class 0: stationary, Class 1: 45 deg 1 pixel, Class 2: 45 deg 2 pixels, ..., Class 16: 315 deg 2 pixels
     # test_init_idx = np.shape(cur_pos)[1]//2
-    # innitial_pos = cur_pos[:,test_init_idx]
+    # innitial_pos = cur_pos[:,test_init_idx]    
+    return accuracy, report, all_predictions, all_targets
 
-    # Calculate the trayectory
-    trayectory = np.zeros((2,len(all_predictions))).T
-    trayectory[:,0] = test_curs_pos[:,0] # Initial position
-    for i in range(1,len(all_predictions)):
-        label = all_predictions[i]
-        direction = (label-1)//2 * 45
-        speed = 1 if (label-1)%2 == 0 else 2 
-        if label == 0:
-            trayectory[i,:] = trayectory[i-1,:]
-        else:
-            trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction)),np.sin(np.deg2rad(direction))]).T
+def evaluate_regression_model(model, data_loader, device):
+    model.eval()
+    pred_var = [] # predicted position or velocity
+    gt_var = [] # ground truth position or velocity
+    with torch.no_grad():
+        for batch_id, (inputs, targets) in tqdm.tqdm(enumerate(data_loader)):
+            batch_size, seq_len, _ = inputs.size()
+            inputs, targets = inputs.to(device), targets.to(device)
+            
+            # Initialize hidden state
+            hidden = model.init_hidden(batch_size).to(device)
+            
+            # Process each time step
+            for t in range(seq_len):
+                input_t = inputs[:, t, :]
+                output_t, hidden = model(input_t, hidden)
+            
+            # Get the predictions and targets for the final time step in the sequence
+            pred_var.extend(output_t.cpu().numpy())
+            gt_var.extend(targets[:, -1].cpu().numpy())
 
-    # Calculate the trajectory R2 score
-    ss_res = np.sum((trayectory - test_curs_pos) ** 2)  # Residual sum of squares
-    ss_tot = np.sum((trayectory - np.mean(trayectory)) ** 2)  # Total sum of squares
-    r_squared = 1 - (ss_res / ss_tot)
+        
+            # Calculate the R2 score
+            ss_res = np.sum((pred_var - gt_var) ** 2)  # Residual sum of squares
+            ss_tot = np.sum((pred_var - np.mean(pred_var)) ** 2)  # Total sum of squares
+            r_squared = 1 - (ss_res / ss_tot)
+        return r_squared, pred_var, gt_var, pred_var  
+
+def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
+    if discrete_output:
+        # Calculate the trayectory
+        trayectory = np.zeros((2,len(pred_vel))).T
+        trayectory[0,:] = gt_pos[0,:] # Initial position
+        for i in range(1,len(pred_vel)):
+            label = pred_vel[i]
+            direction = (label-1)//2 * 45
+            speed = 1 if (label-1)%2 == 0 else 2 
+            if label == 0:
+                trayectory[i,:] = trayectory[i-1,:]
+            else:
+                trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction)),np.sin(np.deg2rad(direction))]).T
+
+        # Calculate the trajectory R2 score
+        ss_res = np.sum((trayectory - gt_pos) ** 2)  # Residual sum of squares
+        ss_tot = np.sum((trayectory - np.mean(trayectory)) ** 2)  # Total sum of squares
+        r_squared = 1 - (ss_res / ss_tot)
     
-    return accuracy, report, trayectory, r_squared
+    else: 
+        # Calculate the trayectory
+        trayectory = np.zeros((len(pred_vel),2))
+        trayectory[0,:] = gt_pos[0,:] # Initial position
+        for i in range(1,len(pred_vel)):
+            trayectory[i,:] = trayectory[i-1,:] + pred_vel[i]
+
+        # Calculate the trajectory R2 score
+        ss_res = np.sum((trayectory - gt_pos) ** 2)  # Residual sum of squares
+        ss_tot = np.sum((trayectory - np.mean(trayectory)) ** 2)  # Total sum of squares
+        r_squared = 1 - (ss_res / ss_tot)
+    return trayectory, r_squared
+
 
 # ------------ Plotting Functions -------------- #
 def pred_vs_gt_plot(predictions, ground_truth, r_squared, title=''): #predictions [N,2], ground_truth [N,2]

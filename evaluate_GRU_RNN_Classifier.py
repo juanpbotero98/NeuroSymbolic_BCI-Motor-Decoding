@@ -4,13 +4,14 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from Models import GRU_RNN
 import nengo  
-from util import get_data_BIOCAS, evaluate_classification_model
+from util import get_data_BIOCAS, evaluate_classification_model, calculate_trayectory
 from data_loader_utils import Batch_Dataset_Discrete
 from sklearn.model_selection import train_test_split
 import os
+import pandas as pd
 
 # Main evaluation script
-def main(gpu=False):
+def main(gpu=True):
     # Configurations
     input_size = 192
     latent_size = 128
@@ -31,7 +32,8 @@ def main(gpu=False):
     model.to(device)
     
     # Load pre-trained model weights if available
-    trained_model_path = os.path.join(os.getcwd(),'Trained_Models','gru_classifier-ls128-sql1000-15epochs.pth')
+    model_name = "gru_classifier-ls128-sql1000-15epochs"
+    trained_model_path = os.path.join(os.getcwd(),'Trained_Models',f'{model_name}.pth')
     checkpoint = torch.load(trained_model_path,map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     
@@ -58,12 +60,23 @@ def main(gpu=False):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     print(len(test_dataset)) 
     # Evaluate the model
-    accuracy, report, trayectory, rsquared = evaluate_classification_model(model, test_loader, device, test_pos)
-
-    # Print results
-    print(f"Test Accuracy: {accuracy * 100:.2f}%")
-    print("Classification Report:")
+    accuracy, report, all_predictions, all_labels = evaluate_classification_model(model, test_loader, device, test_pos)
+    print('Model: {} - Accuracy: {:.2f}%'.format(model_name, accuracy * 100))
     print(report)
+    # Save results
+    results = np.hstack((all_predictions, all_labels, test_pos))
+    columns = ["Predicted Vel Label", "GT Vel Label", "GT Pos"]
+    results_df = pd.DataFrame(results, columns=columns)
+    results_df.to_csv(f"{model_name}_Predicted_and_GT.csv", index=False)
+
+    # Calculate trayectory
+    rsquared, trayectory = calculate_trayectory(all_predictions, test_pos, discrete_output=True)
+    print(f"R-squared: {rsquared:.4f}")
+    # Group trayectory and save as csv
+    pos_results = np.hstack((trayectory, test_pos))
+    columns = ["Predicted Trayectory", "GT Pos"]
+    pos_results_df = pd.DataFrame(pos_results, columns=columns)
+    pos_results_df.to_csv(f"{model_name}_Trayectory_and_GT.csv", index=False)
 
 
 if __name__ == "__main__":
