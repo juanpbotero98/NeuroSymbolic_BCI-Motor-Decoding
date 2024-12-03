@@ -385,10 +385,10 @@ def evaluate_classification_model(model, data_loader, device, test_curs_pos):
                 input_t = inputs[:, t, :]
                 output_t, hidden = model(input_t, hidden)
             
-            # Get the predictions and targets for the final time step in the sequence
-            _, predicted = torch.max(output_t, 1)
-            all_predictions.extend(predicted.cpu().numpy())
-            all_targets.extend(targets[:, -1].cpu().numpy())
+                # Get the predictions and targets for the final time step in the sequence
+                _, predicted = torch.max(output_t, 1)
+                all_predictions.extend(predicted.cpu().numpy())
+                all_targets.extend(targets[:, t].cpu().numpy())
     
     # Compute accuracy and detailed classification report
     accuracy = accuracy_score(all_targets, all_predictions)
