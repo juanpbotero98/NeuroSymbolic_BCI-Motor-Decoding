@@ -26,7 +26,7 @@ def main(epochs= 10, model_path=None):
 
     # Model ID = date-GRU-classifier-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}
     date = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_id = f"{date}-GRU-classifier-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}--{epochs}epochs"
+    model_id = f"{date}-GRU-classifier-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}--{epochs}epochs-0.5dropout"
     log_dir = f"./Training_logs/{model_id}" 
     os.makedirs(log_dir, exist_ok=True)
 
@@ -44,7 +44,7 @@ def main(epochs= 10, model_path=None):
 
     # Define Loss and Optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4) # L2 regularization	
 
     # Load model checkpoint if provided
     if model_path is not None:
@@ -60,7 +60,7 @@ def main(epochs= 10, model_path=None):
 
     # Load data 
     file_name = "indy_20160407_02.mat"
-    inputfile = os.path.join("Dataset", "NHP Reaching Sensorimotor Ephys", file_name)
+    inputfile = os.path.join("Dataset", file_name)
     # Check if file exists
     print(os.path.isfile(inputfile))
     cur_pos, spike_data, labels = get_data_BIOCAS(inputfile, discretize_output=True)

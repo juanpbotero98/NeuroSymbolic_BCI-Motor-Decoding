@@ -1,0 +1,17 @@
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/condabin/conda
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/bin/conda
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/bin/conda-env
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/bin/activate
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/bin/deactivate
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/etc/profile.d/conda.sh
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/etc/fish/conf.d/conda.fish
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/shell/condabin/Conda.psm1
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/shell/condabin/conda-hook.ps1
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/lib/python3.12/site-packages/xontrib/conda.xsh
+no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/etc/profile.d/conda.csh
+no change     /uufs/chpc.utah.edu/common/home/u1437983/.bashrc
+No action taken.
+Traceback (most recent call last):
+  File "/uufs/chpc.utah.edu/common/home/u1437983/Documents/NDA_Projects/NeuroSymbolic_BCI-Motor-Decoding/train_GRU_RNN.py", line 1, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'

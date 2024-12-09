@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --partition=notchpeak-gpu
 #SBATCH --account=notchpeak-gpu
 #SBATCH --gres=gpu:3090:1
@@ -15,4 +15,4 @@ module load miniforge3/latest
 conda init 
 conda activate Neurosymbolic
 # run training script
-python evaluate_GRU_RNN_Classifier.py 
+python evaluate_GRU_RNN_Classifier.py --gpu True

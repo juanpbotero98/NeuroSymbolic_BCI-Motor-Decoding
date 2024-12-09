@@ -16,9 +16,7 @@ All models must meet a few requirements
 
 
 class GRU_RNN(nn.Module):
-    def __init__(
-        self, latent_size, input_size=None, output_size=None, latent_ic_var=0.05
-    ):
+    def __init__(self, latent_size, input_size=None, output_size=None, latent_ic_var=0.05, dropout=0.5):
         super().__init__()
         self.input_size = input_size
         self.latent_size = latent_size
@@ -29,6 +27,7 @@ class GRU_RNN(nn.Module):
             torch.zeros(latent_size), requires_grad=True
         )
         self.latent_ic_var = latent_ic_var
+        self.recurrent_dropout = RecurrentDropout(0.5)
 
     def init_model(self, input_size, output_size):
         self.input_size = input_size
@@ -43,6 +42,7 @@ class GRU_RNN(nn.Module):
 
     def forward(self, inputs, hidden):
         hidden = self.cell(inputs, hidden)
+        hidden = self.recurrent_dropout(hidden)
         output = self.readout(hidden)
         return output, hidden
     
@@ -81,3 +81,15 @@ class GRU_RNN_StructPred(nn.Module):
         # Beam search forward pass
 
         return output, hidden
+    
+
+class RecurrentDropout(nn.Module):
+    def __init__(self, p):
+        super(RecurrentDropout, self).__init__()
+        self.p = p
+
+    def forward(self, x):
+        if not self.training or self.p == 0:
+            return x
+        mask = x.new(x.size()).bernoulli_(1 - self.p).div_(1 - self.p)
+        return x * mask

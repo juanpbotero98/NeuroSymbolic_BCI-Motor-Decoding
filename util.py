@@ -368,7 +368,7 @@ def compute_correlation_matrix(projected_data, cursor_data):
     plt.show()
     return correlation_matrix
 
-def evaluate_classification_model(model, data_loader, device, test_curs_pos):
+def evaluate_classification_model(model, data_loader, device):
     model.eval()
     all_targets = []
     all_predictions = []
@@ -385,10 +385,12 @@ def evaluate_classification_model(model, data_loader, device, test_curs_pos):
                 input_t = inputs[:, t, :]
                 output_t, hidden = model(input_t, hidden)
             
-                # Get the predictions and targets for the final time step in the sequence
-                _, predicted = torch.max(output_t, 1)
-                all_predictions.extend(predicted.cpu().numpy())
-                all_targets.extend(targets[:, t].cpu().numpy())
+            # Get the predictions and targets for the final time step in the sequence
+            _, predicted = torch.max(output_t, 1)
+            all_predictions.extend(predicted.cpu().numpy())
+            all_targets.extend(targets[:, -1].cpu().numpy())
+    # Add padding to the predicted labels to match the length of the cursor data
+    all_predictions = np.hstack((np.zeros(len(all_targets)-len(all_predictions)),all_predictions))
     
     # Compute accuracy and detailed classification report
     accuracy = accuracy_score(all_targets, all_predictions)
@@ -416,16 +418,18 @@ def evaluate_regression_model(model, data_loader, device):
                 input_t = inputs[:, t, :]
                 output_t, hidden = model(input_t, hidden)
             
-            # Get the predictions and targets for the final time step in the sequence
+            # Get the predictions and targets for the current time step
             pred_var.extend(output_t.cpu().numpy())
             gt_var.extend(targets[:, -1].cpu().numpy())
 
-        
+            # Add padding to the predicted values to match the length of the cursor data
+            pred_var = np.hstack((np.zeros((len(gt_var)-len(pred_var),2)),pred_var))
+
             # Calculate the R2 score
             ss_res = np.sum((pred_var - gt_var) ** 2)  # Residual sum of squares
             ss_tot = np.sum((pred_var - np.mean(pred_var)) ** 2)  # Total sum of squares
             r_squared = 1 - (ss_res / ss_tot)
-        return r_squared, pred_var, gt_var, pred_var  
+        return r_squared, pred_var, gt_var  
 
 def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
     if discrete_output:

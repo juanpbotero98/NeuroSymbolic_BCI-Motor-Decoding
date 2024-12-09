@@ -17,6 +17,7 @@ class BeamSearch:
         self.beam_width = beam_width
         self.max_steps = max_steps
         self.constraints = []  # List of constraint functions
+        self.penalty_fn = None  # Function to apply penalties to scores (aka soft constraints)
 
     def add_constraint(self, constraint_fn):
         """
@@ -26,6 +27,15 @@ class BeamSearch:
             constraint_fn (function): Function that takes a sequence and returns True if valid.
         """
         self.constraints.append(constraint_fn)
+
+    def add_penalty(self, penalty_fn):
+        """
+        Adds a penalty function to apply to scores.
+
+        Args:
+            penalty_fn (function): Function that takes a sequence and returns a penalty score.
+        """
+        self.penalty_fn = penalty_fn
 
     def apply_constraints(self, sequence):
         """
@@ -64,6 +74,9 @@ class BeamSearch:
 
                     # Apply constraints (if any)
                     if not self.constraints or self.apply_constraints(new_sequence):
+                        if self.penalty_fn:
+                            penalty = self.penalty_fn(new_sequence)
+                            new_score *= penalty
                         all_candidates.append((new_sequence, new_score))
 
             # Keep the top `beam_width` sequences
@@ -71,7 +84,7 @@ class BeamSearch:
 
         return beam
 
-    # Example constraint methods (optional, users can define their own constraints)
+    # Max length constraint
     def add_max_length_constraint(self, max_length):
         """
         Adds a constraint to limit the maximum length of sequences.
@@ -81,17 +94,10 @@ class BeamSearch:
         """
         self.add_constraint(lambda sequence: len(sequence) <= max_length)
 
-    def add_no_repeats_constraint(self):
-        """
-        Adds a constraint to prevent repeated states in the sequence.
-        """
-        self.add_constraint(lambda sequence: len(sequence) == len(set(sequence)))
-
-    def add_end_token_constraint(self, end_token):
-        """
-        Adds a constraint to ensure the sequence ends with a specific token.
-
-        Args:
-            end_token (str): The required ending token.
-        """
-        self.add_constraint(lambda sequence: sequence[-1] == end_token if len(sequence) > 0 else False)
+    # Non-repeating/consistency constraint
+    def non_repeating_penalty(sequence):
+        unique_values = len(set(sequence))
+        total_values = len(sequence)
+        # Penalty: The more unique values, the higher the penalty
+        penalty = 1.0 / (1.0 + unique_values / total_values)  # Scaled penalty
+        return penalty 

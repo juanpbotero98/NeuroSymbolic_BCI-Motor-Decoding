@@ -8,7 +8,7 @@
 #SBATCH --time=1-00:00:00
 
 # load your module
-module purge
+module --force purge
 module load miniforge3/latest
 
 # activate conda environment

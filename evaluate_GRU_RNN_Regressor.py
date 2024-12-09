@@ -4,7 +4,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from Models import GRU_RNN
 import nengo  
-from util import get_data_BIOCAS, evaluate_regression_model
+from util import get_data_BIOCAS, evaluate_regression_model, calculate_trayectory
 from data_loader_utils import Batch_Dataset_Discrete
 from sklearn.model_selection import train_test_split
 import os
@@ -40,34 +40,85 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
     # Load test data
     file_name = "indy_20160407_02.mat"
     inputfile = os.path.join("Dataset", file_name)
-    cur_pos, spike_data, labels = get_data_BIOCAS(inputfile, discretize_output=True)
+    cur_pos, spike_data, cur_vel = get_data_BIOCAS(inputfile, discretize_output=False)
     # Calculate instantaneous firing rate from spike data applying synaptic filter
     synapse = nengo.synapses.Lowpass(tau=0.7) # tau is taken from Naive model (L2 reg linear regression) optimal value 
     FR = synapse.filt(spike_data)
 
-    # Split dataset 
-    train_FR, test_FR, train_labels, test_labels, train_pos, test_pos = train_test_split(FR.T, labels.T, cur_pos.T,test_size=0.5,shuffle=False) # 50% train, 50% test
-    val_FR, train_FR, val_labels, train_labels, train_pos, test_pos = train_test_split(train_FR, train_labels, train_pos,test_size=0.75,shuffle=False) # 25% val, 75% train
+    # train-test split 
+    train_FR, test_FR, train_vel, test_vel = train_test_split(FR.T, cur_vel.T,test_size=0.5,shuffle=False) # 50% train, 50% test
+    train_FR, test_FR,train_pos, test_pos  = train_test_split(FR.T, cur_pos.T,test_size=0.5,shuffle=False) # 50% train, 50% test
 
-    # Prepare test dataset and data loader
+    # train-val split
+    train_FR_temp, val_FR, train_vel, val_vel = train_test_split(train_FR, cur_vel, test_size=0.25, shuffle=False) # 75% train, 25% validation
+    train_FR, val_FR, train_pos, val_pos = train_test_split(train_FR, train_pos, test_size=0.25, shuffle=False) # 75% train, 25% validation
+    # Determine the gt signal
+    if decoded_var == 'pos':
+        train_gt = train_pos
+        val_gt = val_pos
+        test_gt = test_pos
+    
+    elif decoded_var == 'vel':
+        train_gt = train_vel
+        val_gt = val_vel
+        test_gt = test_vel
+        
+    # Prepare the datasets and data loaders
+    # train data 
+    train_FR_tensor = torch.tensor(train_FR.T, dtype=torch.float32).to(device)
+    train_gt_tensor = torch.tensor(train_gt.T, dtype=torch.long).long().to(device)
+    train_dataset = Batch_Dataset_Discrete(train_FR_tensor, train_gt_tensor, seq_len)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    # validation data
+    val_FR_tensor = torch.tensor(val_FR.T, dtype=torch.float32).to(device)
+    val_gt_tensor = torch.tensor(val_gt.T, dtype=torch.long).long().to(device)
+    val_dataset = Batch_Dataset_Discrete(val_FR_tensor, val_gt_tensor, seq_len)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    # test data    
     test_FR_tensor = torch.tensor(test_FR.T, dtype=torch.float32).to(device)
-    test_pos_tensor = torch.tensor(test_pos.T, dtype=torch.long).long().to(device)
-    print(test_FR_tensor.shape)  
-    print(test_pos_tensor.shape)
-
-    test_dataset = Batch_Dataset_Discrete(test_FR_tensor, test_pos_tensor, seq_len)
+    test_gt_tensor = torch.tensor(test_gt.T, dtype=torch.long).long().to(device)
+    test_dataset = Batch_Dataset_Discrete(test_FR_tensor, test_gt_tensor, seq_len)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    print(len(test_dataset)) 
-    # Evaluate the model
-    accuracy, report, trayectory, rsquared, all_predictions, all_labels = evaluate_regression_model(model, test_loader, device, test_pos)
-    # Save results
-    # Group predictions and labels and save as csv
-    results = np.hstack((all_predictions, all_labels))
-    columns = ["Predicted", "True"]
-    results_df = pd.DataFrame(results, columns=columns)
-    results_df.to_csv(f"{model_name}_Predicted_and_GT.csv", index=False)
+
+    print('TRAINING: FR shape= {} | GT shape= {} | Position shape= {}'.format(train_FR_tensor.shape, train_gt_tensor.shape, train_pos.shape))
+    print('VALIDATION: FR shape= {} | GT shape= {} | Position shape= {}'.format(val_FR_tensor.shape, val_gt_tensor.shape, val_pos.shape))
+    print('TEST: FR shape= {} | GT shape= {} | Position shape= {}'.format(test_FR_tensor.shape, test_gt_tensor.shape, test_pos.shape))
+
+    data_loaders = {"train": train_loader, "val": val_loader, "test": test_loader}
+    position_gt = {"train": train_pos, "val": val_pos, "test": test_pos}
+
+    # Data containers
+    all_predictions = []
+    all_gt = []
+    all_trayectory = []
+    phases = []
+    r2_pred = []
+    r2_trayectory = []
+
+    for phase, data_loader in data_loaders.items():
+
+        # Evaluate the model
+        r_squared_pred, pred_var, gt_var = evaluate_regression_model(model, test_loader, device, test_pos)
+        print('Phase: {} | R-squared: {}'.format(phase, r_squared_pred))
+
+        # Calculate trayectory
+        if decoded_var == 'vel':
+            rsquared_tray, trayectory_phase = calculate_trayectory(pred_var, test_pos, discrete_output=False)
+        else: 
+            trayectorty_phase = decoded_var
+            r_squared_tray = r_squared_pred
+        
+        # Store results
+        all_predictions.extend(pred_var)
+        all_gt.extend(gt_var)
+        all_trayectory.extend(trayectory_phase)
+        phases.extend([phase]*len(gt_var))
+    
+    all_pos = np.vstack((train_pos, val_pos, test_pos))
+    
+
     # Group trayectory and save as csv
-    pos_results = np.hstack((trayectory, test_pos))
+    pos_results = np.vstack((all_predictions, all_gt, all_trayectory[:,0].T, all_trayectory[:,1].T,all_pos[:,0].T, all_pos[:,1].T, phases, all_r2)).T
     columns = ["Predicted Trayectory", "True"]
     pos_results_df = pd.DataFrame(pos_results, columns=columns)
     pos_results_df.to_csv(f"{model_name}_Trayectory_and_GT.csv", index=False)

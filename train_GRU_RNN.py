@@ -28,7 +28,7 @@ def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
     # Model ID = {date}-GRU-regressor-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}
     date = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     if log_dir is None:
-        model_id = f"{date}-GRU_regressor_{objective}-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}-{epochs}epochs"
+        model_id = f"{date}-GRU_regressor_{objective}-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}-{epochs}epochs-0.5dropout"
         log_dir = f"./Training_logs/{model_id}"
     os.makedirs(log_dir, exist_ok=True)
 
