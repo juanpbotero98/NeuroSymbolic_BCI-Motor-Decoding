@@ -27,7 +27,7 @@ class GRU_RNN(nn.Module):
             torch.zeros(latent_size), requires_grad=True
         )
         self.latent_ic_var = latent_ic_var
-        self.recurrent_dropout = RecurrentDropout(0.5)
+        self.recurrent_dropout = RecurrentDropout(dropout)
 
     def init_model(self, input_size, output_size):
         self.input_size = input_size

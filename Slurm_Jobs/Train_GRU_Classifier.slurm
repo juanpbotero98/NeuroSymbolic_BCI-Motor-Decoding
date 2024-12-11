@@ -16,4 +16,4 @@ conda init
 conda activate Neurosymbolic
 
 # run training script
-python train_GRU_RNN_Classifier.py --epochs 15
+python train_GRU_RNN_Classifier.py --epochs 15 --log_dir "./Training_logs/20241210-175231-GRU-classifier-ls128-lr0.001-bs32-sl1000--15epochs-0.5dropout" --load_model True

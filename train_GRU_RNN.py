@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 import argparse
 import datetime
 
-def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
+def main(epochs= 10, log_dir=None, objective='pos', load_model=False):
     # Configuration
     input_size = 192 # Electrodes
     output_size = 2 # X and Y velocity
@@ -28,7 +28,8 @@ def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
     # Model ID = {date}-GRU-regressor-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}
     date = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     if log_dir is None:
-        model_id = f"{date}-GRU_regressor_{objective}-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}-{epochs}epochs-0.5dropout"
+        model_id = f"{date}-GRU_regressor_{objective}-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}-{epochs}epochs"
+        print(f"Model ID: {model_id}")
         log_dir = f"./Training_logs/{model_id}"
     os.makedirs(log_dir, exist_ok=True)
 
@@ -40,7 +41,7 @@ def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
     print("Using device: {}".format(torch.cuda.get_device_name(torch.cuda.current_device())))
 
     # Initialize Model
-    model = GRU_RNN(latent_size=latent_size)
+    model = GRU_RNN(latent_size=latent_size, dropout=0)
     model.init_model(input_size=input_size, output_size=output_size)
     model.to(device)
 
@@ -49,7 +50,8 @@ def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # Load model checkpoint if provided
-    if model_path is not None:
+    if load_model:
+        model_path = os.path.join(log_dir, "gru_rnn_checkpoint.pth")
         checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -62,7 +64,7 @@ def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
 
     # Load data 
     file_name = "indy_20160407_02.mat"
-    inputfile = os.path.join("Dataset", "NHP Reaching Sensorimotor Ephys", file_name)
+    inputfile = os.path.join("Dataset", file_name)
     cur_pos, spike_data, cur_vel = get_data_BIOCAS(inputfile)
     # Calculate instantaneous firing rate from spike data applying synaptic filter
     synapse = nengo.synapses.Lowpass(tau=0.7) # tau is taken from Naive model (L2 reg linear regression) optimal value 
@@ -153,11 +155,12 @@ def main(epochs= 10, model_path=None, log_dir=None, objective='pos'):
 if __name__ == "__main__":
     # read arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, default=None, help="Path to model checkpoint")
+    parser.add_argument("--load_model", type=bool, default=False, help="Path to model checkpoint")
     parser.add_argument("--epochs", type=int, default=15, help="Number of epochs to train")
     parser.add_argument("--objective", type=str, default='pos', help="Objective to train the model on: 'pos' or 'vel'")
     parser.add_argument("--log_dir", type=str, default=None, help="Directory to save TensorBoard logs")
     args = parser.parse_args()
 
     # Run training loop
-    main(epochs=args.epochs, model_path=args.model_path, log_dir=args.log_dir, objective=args.objective)
+    print(args.load_model)
+    main(epochs=args.epochs, load_model=args.load_model, log_dir=args.log_dir, objective=args.objective)
