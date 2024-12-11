@@ -430,13 +430,12 @@ def evaluate_regression_model(model, data_loader, device):
             pred_var.extend(output_t.cpu().numpy())
             gt_var.extend(targets[:, -1].cpu().numpy())
 
-            # Add padding to the predicted values to match the length of the cursor data
-            pred_var = np.hstack((np.zeros((len(gt_var)-len(pred_var),2)),pred_var))
-
-            # Calculate the R2 score
-            ss_res = np.sum((pred_var - gt_var) ** 2)  # Residual sum of squares
-            ss_tot = np.sum((pred_var - np.mean(pred_var)) ** 2)  # Total sum of squares
-            r_squared = 1 - (ss_res / ss_tot)
+        # Calculate the R2 score
+        pred_var = np.array(pred_var)
+        gt_var = np.array(gt_var)
+        ss_res = np.sum((pred_var - gt_var) ** 2)  # Residual sum of squares
+        ss_tot = np.sum((pred_var - np.mean(pred_var)) ** 2)  # Total sum of squares
+        r_squared = 1 - (ss_res / ss_tot)
         return r_squared, pred_var, gt_var  
 
 def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
