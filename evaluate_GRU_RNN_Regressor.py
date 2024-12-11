@@ -5,23 +5,23 @@ from torch.utils.data import DataLoader, Dataset
 from Models import GRU_RNN
 import nengo  
 from util import get_data_BIOCAS, evaluate_regression_model, calculate_trayectory
-from data_loader_utils import Batch_Dataset_Discrete
+from data_loader_utils import Batch_Dataset
 from sklearn.model_selection import train_test_split
 import os
 import pandas as pd
 import argparse
 # Main evaluation script
-def main(model_name, gpu=True, decoded_var = 'pos'):
+def main(model_name, gpu=True, decoded_var = 'vel'):
     # Configurations
     input_size = 192
     latent_size = 128
-    num_classes = 17
+    output_size = 2
     seq_len = 1000
     batch_size = 32
     
     # Initialize the model and load trained weights
     model = GRU_RNN(latent_size=latent_size)
-    model.init_model(input_size=input_size, output_size=num_classes)
+    model.init_model(input_size, output_size=output_size)
     # Check if GPU is available
     if gpu:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -50,7 +50,7 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
     train_FR, test_FR,train_pos, test_pos  = train_test_split(FR.T, cur_pos.T,test_size=0.5,shuffle=False) # 50% train, 50% test
 
     # train-val split
-    train_FR_temp, val_FR, train_vel, val_vel = train_test_split(train_FR, cur_vel, test_size=0.25, shuffle=False) # 75% train, 25% validation
+    train_FR_temp, val_FR, train_vel, val_vel = train_test_split(train_FR, train_vel, test_size=0.25, shuffle=False) # 75% train, 25% validation
     train_FR, val_FR, train_pos, val_pos = train_test_split(train_FR, train_pos, test_size=0.25, shuffle=False) # 75% train, 25% validation
     # Determine the gt signal
     if decoded_var == 'pos':
@@ -66,13 +66,13 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
     # Prepare the datasets and data loaders
     # Crop the first 3k samples from all data for short debugging
     train_FR = train_FR[:3011]
-    train_labels = train_labels[:3011]
+    train_gt = train_gt[:3011]
     train_pos = train_pos[:3011]
     val_FR = val_FR[:3011]
-    val_labels = val_labels[:3011]
+    val_gt = val_gt[:3011]
     val_pos = val_pos[:3011]
     test_FR = test_FR[:3011]
-    test_labels = test_labels[:3011]
+    test_gt = test_gt[:3011]
     test_pos = test_pos[:3011]
     # Drop the last samples to make the data divisible by the sequence length
     train_FR = train_FR[:-(train_FR.shape[0] % seq_len)]
@@ -81,22 +81,24 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
     val_gt = val_gt[:-(val_gt.shape[0] % seq_len)]
     test_FR = test_FR[:-(test_FR.shape[0] % seq_len)]
     test_gt = test_gt[:-(test_gt.shape[0] % seq_len)]
+    train_pos = train_pos[:-(train_pos.shape[0] % seq_len)]
+    val_pos = val_pos[:-(val_pos.shape[0] % seq_len)]
     test_pos = test_pos[:-(test_pos.shape[0] % seq_len)]
 
     # train data 
     train_FR_tensor = torch.tensor(train_FR.T, dtype=torch.float32).to(device)
     train_gt_tensor = torch.tensor(train_gt.T, dtype=torch.long).long().to(device)
-    train_dataset = Batch_Dataset_Discrete(train_FR_tensor, train_gt_tensor, seq_len)
+    train_dataset = Batch_Dataset(train_FR_tensor, train_gt_tensor, seq_len)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     # validation data
     val_FR_tensor = torch.tensor(val_FR.T, dtype=torch.float32).to(device)
     val_gt_tensor = torch.tensor(val_gt.T, dtype=torch.long).long().to(device)
-    val_dataset = Batch_Dataset_Discrete(val_FR_tensor, val_gt_tensor, seq_len)
+    val_dataset = Batch_Dataset(val_FR_tensor, val_gt_tensor, seq_len)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     # test data    
     test_FR_tensor = torch.tensor(test_FR.T, dtype=torch.float32).to(device)
     test_gt_tensor = torch.tensor(test_gt.T, dtype=torch.long).long().to(device)
-    test_dataset = Batch_Dataset_Discrete(test_FR_tensor, test_gt_tensor, seq_len)
+    test_dataset = Batch_Dataset(test_FR_tensor, test_gt_tensor, seq_len)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     print('TRAINING: FR shape= {} | GT shape= {} | Position shape= {}'.format(train_FR_tensor.shape, train_gt_tensor.shape, train_pos.shape))
@@ -120,14 +122,14 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
     for phase, data_loader in data_loaders.items():
 
         # Evaluate the model
-        r_squared_pred, pred_var, gt_var = evaluate_regression_model(model, data_loader, device, test_pos)
+        r_squared_pred, pred_var, gt_var = evaluate_regression_model(model, data_loader, device)
         print('Phase: {} | R-squared: {}'.format(phase, r_squared_pred))
 
         # Calculate trayectory
         if decoded_var == 'vel':
-            r_squared_tray, trayectory_phase = calculate_trayectory(pred_var, test_pos, discrete_output=False)
+            trayectory_phase, r_squared_tray = calculate_trayectory(pred_var, test_pos, discrete_output=False)
         else: 
-            trayectorty_phase = decoded_var
+            trayectory_phase = decoded_var
             r_squared_tray = r_squared_pred
         
         # Store results
@@ -167,7 +169,7 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpu", type=bool, default=False, help="Use GPU if available")
-    parser.add_argument("--model_name", type=str, default='gru_regressor_pos-ls128-sql100-15epoch', help="Name of the model to evaluate")
-    parser.add_argument("--decoded_var", type=str, default='pos', help="Variable to decode: 'pos' or 'vel'")
+    parser.add_argument("--model_name", type=str, default='gru_regressor_vel-ls128-sql100-15epoch', help="Name of the model to evaluate")
+    parser.add_argument("--decoded_var", type=str, default='vel', help="Variable to decode: 'pos' or 'vel'")
     args = parser.parse_args()
     main(args.model_name, args.gpu, args.decoded_var)
