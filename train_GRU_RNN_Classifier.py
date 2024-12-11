@@ -19,8 +19,10 @@ def main(epochs= 10, model_path=None, log_dir=None, load_model=False):
     input_size = 192
     num_classes = 17
     latent_size = 128
+    # Training parameters
     batch_size = 32
-    seq_len =   300 # Sequence length of 1 second at 1 kHz
+    seq_len = 100  # Sequence length of 1 second at 1 kHz
+    stride = 1
     epochs = 15
     learning_rate = 1e-3
 
@@ -33,6 +35,7 @@ def main(epochs= 10, model_path=None, log_dir=None, load_model=False):
         model_id = log_dir.split("/")[-1]
         date = model_id.split("-")[0]
     os.makedirs(log_dir, exist_ok=True)
+
 
     # Initialize TensorBoard SummaryWriter
     writer = SummaryWriter(log_dir=log_dir)

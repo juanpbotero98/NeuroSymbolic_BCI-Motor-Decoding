@@ -55,6 +55,29 @@ def main(gpu=False):
     train_FR_temp, val_FR, train_labels, val_labels = train_test_split(train_FR, train_labels, test_size=0.25, shuffle=False) # 75% train, 25% validation
     train_FR, val_FR, train_pos, val_pos = train_test_split(train_FR, train_pos, test_size=0.25, shuffle=False) # 75% train, 25% validation
 
+    # Crop the first 3k samples from all data for short debugging
+    # train_FR = train_FR[:3011]
+    # train_labels = train_labels[:3011]
+    # train_pos = train_pos[:3011]
+    # val_FR = val_FR[:3011]
+    # val_labels = val_labels[:3011]
+    # val_pos = val_pos[:3011]
+    # test_FR = test_FR[:3011]
+    # test_labels = test_labels[:3011]
+    # test_pos = test_pos[:3011]
+
+    # Drop the last samples to make the data divisible by the sequence length 
+    train_FR = train_FR[:-(train_FR.shape[0] % seq_len)]
+    train_labels = train_labels[:-(train_labels.shape[0] % seq_len)]
+    train_pos = train_pos[:-(train_pos.shape[0] % seq_len)]
+    val_FR = val_FR[:-(val_FR.shape[0] % seq_len)]
+    val_labels = val_labels[:-(val_labels.shape[0] % seq_len)]
+    val_pos = val_pos[:-(val_pos.shape[0] % seq_len)]
+    test_FR = test_FR[:-(test_FR.shape[0] % seq_len)]
+    test_labels = test_labels[:-(test_labels.shape[0] % seq_len)]
+    test_pos = test_pos[:-(test_pos.shape[0] % seq_len)]
+
+    
     # Prepare the datasets and data loaders
     # train data 
     train_FR_tensor = torch.tensor(train_FR.T, dtype=torch.float32).to(device)
@@ -82,32 +105,39 @@ def main(gpu=False):
     # Data containers
     all_predictions = []
     all_labels = []
-    all_trayectory = []
+    all_trayectory_X = []
+    all_trayectory_Y = []
     phases = []
     all_r2 = []
 
     # Model evaluation
     for phase, data_loader in data_loaders.items():
         # Get predictions and labels per phase
-        accuracy, report, phase_pred, phase_labels = evaluate_classification_model(model, data_loader, device, position_gt[phase])
+        accuracy, report, phase_pred, phase_labels = evaluate_classification_model(model, data_loader, device)
         print('Phase: {} | Accuracy: {:.2f}%'.format(phase, accuracy * 100))
         print(report)
 
         # calculate trayectory
-        rsquared, trayectory_phase = calculate_trayectory(phase_pred, position_gt[phase], discrete_output=True)
+        trayectory_phase, rsquared = calculate_trayectory(phase_pred, position_gt[phase], discrete_output=True)
 
         # Store results
         all_predictions.extend(phase_pred)
         all_labels.extend(phase_labels)
-        all_trayectory.extend(trayectory_phase)
+        all_trayectory_X.extend(trayectory_phase[:,0])
+        all_trayectory_Y.extend(trayectory_phase[:,1])
         phases.extend([phase]*len(phase_labels))
         all_r2.extend([rsquared]*len(phase_labels))
 
-
+    # Remove the first seq_len-1 samples from the pos data to match the length of the predictions
+    train_pos = train_pos[seq_len-1:]
+    val_pos = val_pos[seq_len-1:]
+    test_pos = test_pos[seq_len-1:]
     all_pos = np.vstack((train_pos, val_pos, test_pos))
+    all_pos_X = all_pos[:,0]
+    all_pos_Y = all_pos[:,1]
 
     # Save results
-    results = np.vstack((all_predictions, all_labels, all_trayectory[:,0].T, all_trayectory[:,1].T,all_pos[:,0].T, all_pos[:,1].T, phases, all_r2)).T
+    results = np.vstack((all_predictions, all_labels, all_trayectory_X, all_trayectory_Y,all_pos_X, all_pos_Y, phases, all_r2)).T
     columns = ["Pred Vel Label", "GT Vel Label", "Pred X-Pos", "Pred Y-Pos", "GT X-Pos", "GT Y-Pos", "Phase", "R2"]	
     results_df = pd.DataFrame(results, columns=columns)
     results_df.to_csv(f"{model_name}_Evaluation_Results.csv", index=False)

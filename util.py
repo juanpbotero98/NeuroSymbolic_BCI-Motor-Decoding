@@ -384,13 +384,21 @@ def evaluate_classification_model(model, data_loader, device):
             for t in range(seq_len):
                 input_t = inputs[:, t, :]
                 output_t, hidden = model(input_t, hidden)
+                # # for the first batch get the prediction and target for all time steps
+                # if batch_id == 0:
+                #     all_predictions.extend(output_t.cpu().numpy())
+                #     all_targets.extend(targets[:, t].cpu().numpy())
             
             # Get the predictions and targets for the final time step in the sequence
             _, predicted = torch.max(output_t, 1)
             all_predictions.extend(predicted.cpu().numpy())
             all_targets.extend(targets[:, -1].cpu().numpy())
-    # Add padding to the predicted labels to match the length of the cursor data
-    all_predictions = np.hstack((np.zeros(len(all_targets)-len(all_predictions)),all_predictions))
+    # Check if there is a dimension mismatch between the predicted labels and the cursor data
+    if len(all_targets) != len(all_predictions):
+        print("Dimension mismatch between the predicted labels and the cursor data!")
+        print(f"Predicted labels: {len(all_predictions)} | Cursor data: {len(all_targets)}")
+        # Add padding to the predicted labels to match the length of the cursor data
+        all_predictions = np.vstack((np.zeros(len(all_targets)-len(all_predictions)),all_predictions))
     
     # Compute accuracy and detailed classification report
     accuracy = accuracy_score(all_targets, all_predictions)
@@ -432,6 +440,15 @@ def evaluate_regression_model(model, data_loader, device):
         return r_squared, pred_var, gt_var  
 
 def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
+    # Verify dimensions and add padding necessary to match the length of the cursor data
+    # and account for the first 999 ms of the cursor data that is not predicted
+    if len(gt_pos) != len(pred_vel):
+        print("Dimension mismatch between the predicted labels and the cursor data!")
+        print(f"Predicted labels: {len(pred_vel)} | Cursor data: {len(gt_pos)}")
+        # Remove the first 999 ms of the cursor data
+        gt_pos = gt_pos[len(gt_pos)-len(pred_vel):]
+
+
     if discrete_output:
         # Calculate the trayectory
         trayectory = np.zeros((2,len(pred_vel))).T
