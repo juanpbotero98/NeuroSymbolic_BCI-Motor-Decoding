@@ -14,21 +14,25 @@ from sklearn.model_selection import train_test_split
 import argparse
 import datetime
 
-def main(epochs= 10, model_path=None):
-    # Configuration
+def main(epochs= 10, model_path=None, log_dir=None):
+    # Model parameters
     input_size = 192
     num_classes = 17
     latent_size = 128
+    # Training parameters
     batch_size = 32
-    seq_len = 1000  # Sequence length of 1 second at 1 kHz
+    seq_len = 100  # Sequence length of 1 second at 1 kHz
+    stride = 1
     epochs = 15
     learning_rate = 1e-3
 
     # Model ID = date-GRU-classifier-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}
     date = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_id = f"{date}-GRU-classifier-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}--{epochs}epochs-0.5dropout"
-    log_dir = f"./Training_logs/{model_id}" 
+    if log_dir is None:
+        model_id = f"{date}-GRU-classifier-ls{latent_size}-lr{learning_rate}-bs{batch_size}-sl{seq_len}--{epochs}epochs-0.5dropout"
+        log_dir = f"./Training_logs/{model_id}" 
     os.makedirs(log_dir, exist_ok=True)
+
 
     # Initialize TensorBoard SummaryWriter
     writer = SummaryWriter(log_dir=log_dir)

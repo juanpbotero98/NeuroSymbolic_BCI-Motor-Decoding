@@ -9,7 +9,7 @@ from data_loader_utils import Batch_Dataset_Discrete
 from sklearn.model_selection import train_test_split
 import os
 import pandas as pd
-
+import argparse
 # Main evaluation script
 def main(model_name, gpu=True, decoded_var = 'pos'):
     # Configurations
@@ -64,6 +64,25 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
         test_gt = test_vel
         
     # Prepare the datasets and data loaders
+    # Crop the first 3k samples from all data for short debugging
+    train_FR = train_FR[:3011]
+    train_labels = train_labels[:3011]
+    train_pos = train_pos[:3011]
+    val_FR = val_FR[:3011]
+    val_labels = val_labels[:3011]
+    val_pos = val_pos[:3011]
+    test_FR = test_FR[:3011]
+    test_labels = test_labels[:3011]
+    test_pos = test_pos[:3011]
+    # Drop the last samples to make the data divisible by the sequence length
+    train_FR = train_FR[:-(train_FR.shape[0] % seq_len)]
+    train_gt = train_gt[:-(train_gt.shape[0] % seq_len)]
+    val_FR = val_FR[:-(val_FR.shape[0] % seq_len)]
+    val_gt = val_gt[:-(val_gt.shape[0] % seq_len)]
+    test_FR = test_FR[:-(test_FR.shape[0] % seq_len)]
+    test_gt = test_gt[:-(test_gt.shape[0] % seq_len)]
+    test_pos = test_pos[:-(test_pos.shape[0] % seq_len)]
+
     # train data 
     train_FR_tensor = torch.tensor(train_FR.T, dtype=torch.float32).to(device)
     train_gt_tensor = torch.tensor(train_gt.T, dtype=torch.long).long().to(device)
@@ -88,9 +107,12 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
     position_gt = {"train": train_pos, "val": val_pos, "test": test_pos}
 
     # Data containers
-    all_predictions = []
-    all_gt = []
-    all_trayectory = []
+    all_predictions_X = []
+    all_predictions_Y = []
+    all_gt_X = []
+    all_gt_Y = []
+    all_trayectory_X = []
+    all_trayectory_Y = []
     phases = []
     r2_pred = []
     r2_trayectory = []
@@ -98,37 +120,54 @@ def main(model_name, gpu=True, decoded_var = 'pos'):
     for phase, data_loader in data_loaders.items():
 
         # Evaluate the model
-        r_squared_pred, pred_var, gt_var = evaluate_regression_model(model, test_loader, device, test_pos)
+        r_squared_pred, pred_var, gt_var = evaluate_regression_model(model, data_loader, device, test_pos)
         print('Phase: {} | R-squared: {}'.format(phase, r_squared_pred))
 
         # Calculate trayectory
         if decoded_var == 'vel':
-            rsquared_tray, trayectory_phase = calculate_trayectory(pred_var, test_pos, discrete_output=False)
+            r_squared_tray, trayectory_phase = calculate_trayectory(pred_var, test_pos, discrete_output=False)
         else: 
             trayectorty_phase = decoded_var
             r_squared_tray = r_squared_pred
         
         # Store results
-        all_predictions.extend(pred_var)
-        all_gt.extend(gt_var)
-        all_trayectory.extend(trayectory_phase)
+        all_predictions_X.extend(pred_var[:,0])
+        all_predictions_Y.extend(pred_var[:,1])
+        all_gt_X.extend(gt_var[:,0])
+        all_gt_Y.extend(gt_var[:,1])
+        all_trayectory_X.extend(trayectory_phase[:,0])
+        all_trayectory_Y.extend(trayectory_phase[:,1])
+        r2_pred.extend([r_squared_pred]*len(gt_var))
+        r2_trayectory.extend([r_squared_tray]*len(gt_var))
         phases.extend([phase]*len(gt_var))
     
+    # Remove the first seq_len-1 samples from the pos data to match the length of the predictions
+    train_pos = train_pos[seq_len-1:]
+    val_pos = val_pos[seq_len-1:]
+    test_pos = test_pos[seq_len-1:]
     all_pos = np.vstack((train_pos, val_pos, test_pos))
+    all_pos_X = all_pos[:,0]
+    all_pos_Y = all_pos[:,1]
     
 
+
     # Group trayectory and save as csv
-    pos_results = np.vstack((all_predictions, all_gt, all_trayectory[:,0].T, all_trayectory[:,1].T,all_pos[:,0].T, all_pos[:,1].T, phases, all_r2)).T
-    columns = ["Predicted Trayectory", "True"]
+    pos_results = np.vstack((all_predictions_X, all_predictions_Y, all_gt_X, all_gt_Y, all_trayectory_X, all_trayectory_Y,all_pos_X, all_pos_Y, phases, r2_pred, r2_trayectory)).T
+    columns = ["Predicted {} X".format(decoded_var), "Predicted {} Y".format(decoded_var), "GT {} X".format(decoded_var), "GT {} X".format(decoded_var), "Pos X", "Pos Y", "GT Pos X", "GT Pos Y", "Phase", "R2 Pred", "R2 Trayectory"]
     pos_results_df = pd.DataFrame(pos_results, columns=columns)
     pos_results_df.to_csv(f"{model_name}_Trayectory_and_GT.csv", index=False)
 
-    # Print results
-    print(f"Test Accuracy: {accuracy * 100:.2f}%")
-    print("Classification Report:")
-    print(report)
-    print(f"R-squared: {rsquared:.4f}")
+    # # Print results
+    # print(f"Test Accuracy: {accuracy * 100:.2f}%")
+    # print("Classification Report:")
+    # print(report)
+    # print(f"R-squared: {rsquared:.4f}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gpu", type=bool, default=False, help="Use GPU if available")
+    parser.add_argument("--model_name", type=str, default='gru_regressor_pos-ls128-sql100-15epoch', help="Name of the model to evaluate")
+    parser.add_argument("--decoded_var", type=str, default='pos', help="Variable to decode: 'pos' or 'vel'")
+    args = parser.parse_args()
+    main(args.model_name, args.gpu, args.decoded_var)
