@@ -65,15 +65,15 @@ def main(model_name, gpu=True, decoded_var = 'vel'):
         
     # Prepare the datasets and data loaders
     # Crop the first 3k samples from all data for short debugging
-    train_FR = train_FR[:3011]
-    train_gt = train_gt[:3011]
-    train_pos = train_pos[:3011]
-    val_FR = val_FR[:3011]
-    val_gt = val_gt[:3011]
-    val_pos = val_pos[:3011]
-    test_FR = test_FR[:3011]
-    test_gt = test_gt[:3011]
-    test_pos = test_pos[:3011]
+    # train_FR = train_FR[:3011]
+    # train_gt = train_gt[:3011]
+    # train_pos = train_pos[:3011]
+    # val_FR = val_FR[:3011]
+    # val_gt = val_gt[:3011]
+    # val_pos = val_pos[:3011]
+    # test_FR = test_FR[:3011]
+    # test_gt = test_gt[:3011]
+    # test_pos = test_pos[:3011]
     # Drop the last samples to make the data divisible by the sequence length
     train_FR = train_FR[:-(train_FR.shape[0] % seq_len)]
     train_gt = train_gt[:-(train_gt.shape[0] % seq_len)]
@@ -129,7 +129,7 @@ def main(model_name, gpu=True, decoded_var = 'vel'):
         if decoded_var == 'vel':
             trayectory_phase, r_squared_tray = calculate_trayectory(pred_var, test_pos, discrete_output=False)
         else: 
-            trayectory_phase = decoded_var
+            trayectory_phase = pred_var
             r_squared_tray = r_squared_pred
         
         # Store results
@@ -169,7 +169,7 @@ def main(model_name, gpu=True, decoded_var = 'vel'):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpu", type=bool, default=False, help="Use GPU if available")
-    parser.add_argument("--model_name", type=str, default='gru_regressor_vel-ls128-sql100-15epoch', help="Name of the model to evaluate")
-    parser.add_argument("--decoded_var", type=str, default='vel', help="Variable to decode: 'pos' or 'vel'")
+    parser.add_argument("--model_name", type=str, default='gru_regressor_pos-ls128-sql100-15epochs', help="Name of the model to evaluate")
+    parser.add_argument("--decoded_var", type=str, default='pos', help="Variable to decode: 'pos' or 'vel'")
     args = parser.parse_args()
     main(args.model_name, args.gpu, args.decoded_var)
