@@ -84,15 +84,15 @@ class BeamSearch:
 
         return beam
 
-    # Max length constraint
-    def add_max_length_constraint(self, max_length):
-        """
-        Adds a constraint to limit the maximum length of sequences.
+    # # Max length constraint - Not sure it's needed
+    # def add_max_length_constraint(self, max_length):
+    #     """
+    #     Adds a constraint to limit the maximum length of sequences.
 
-        Args:
-            max_length (int): The maximum allowed sequence length.
-        """
-        self.add_constraint(lambda sequence: len(sequence) <= max_length)
+    #     Args:
+    #         max_length (int): The maximum allowed sequence length.
+    #     """
+    #     self.add_constraint(lambda sequence: len(sequence) <= max_length)
 
     # Non-repeating/consistency constraint
     def non_repeating_penalty(sequence):

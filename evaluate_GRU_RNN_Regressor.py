@@ -169,7 +169,7 @@ def main(model_name, gpu=True, decoded_var = 'vel'):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpu", type=bool, default=False, help="Use GPU if available")
-    parser.add_argument("--model_name", type=str, default='gru_regressor_vel-ls128-sql100-15epoch', help="Name of the model to evaluate")
-    parser.add_argument("--decoded_var", type=str, default='vel', help="Variable to decode: 'pos' or 'vel'")
+    parser.add_argument("--model_name", type=str, default='gru_regressor_pos-ls128-sql100-15epochs', help="Name of the model to evaluate")
+    parser.add_argument("--decoded_var", type=str, default='pos', help="Variable to decode: 'pos' or 'vel'")
     args = parser.parse_args()
     main(args.model_name, args.gpu, args.decoded_var)
