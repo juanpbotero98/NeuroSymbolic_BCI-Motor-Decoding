@@ -459,7 +459,7 @@ def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
             if label == 0:
                 trayectory[i,:] = trayectory[i-1,:]
             else:
-                trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction)),np.sin(np.deg2rad(direction))]*1e-3).T # 1e-3 is the time step
+                trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction))*1e-3,np.sin(np.deg2rad(direction))*1e-3]).T # 1e-3 is the time step
 
         # Calculate the trajectory R2 score
         ss_res = np.sum((trayectory - gt_pos) ** 2)  # Residual sum of squares
