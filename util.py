@@ -13,7 +13,7 @@ import matplotlib.patches as mpatches
 import torch
 from sklearn.metrics import accuracy_score, classification_report
 import tqdm
-
+from beam_serach import BeamSearch
 # ------------ Data Handling Functions -------------- #
 def get_data(inputfile):
     """
@@ -437,6 +437,59 @@ def evaluate_regression_model(model, data_loader, device):
         ss_tot = np.sum((pred_var - np.mean(pred_var)) ** 2)  # Total sum of squares
         r_squared = 1 - (ss_res / ss_tot)
         return r_squared, pred_var, gt_var  
+    
+def evaluate_struct_model(model, data_loader, device, beam_search_class):
+    model.eval()
+    all_targets = []
+    all_predictions = []
+    with torch.no_grad():
+        for batch_id, (inputs, targets) in tqdm.tqdm(enumerate(data_loader)):
+            input_size, seq_len, _ = inputs.size()
+            # Probability matrix for the sequence
+            prob_matrix = np.zeros((17,seq_len))
+
+            batch_size, seq_len, _ = inputs.size()
+            inputs, targets = inputs.to(device), targets.to(device)
+            
+            # Initialize hidden state
+            hidden = model.init_hidden(batch_size).to(device)
+            
+            # Process each time step
+            for t in range(seq_len):
+                input_t = inputs[:, t, :]
+                output_t, hidden = model(input_t, hidden)
+                # # for the first batch get the prediction and target for all time steps
+                # if batch_id == 0:
+                #     all_predictions.extend(output_t.cpu().numpy())
+                #     all_targets.extend(targets[:, t].cpu().numpy())
+                # probability for classes at time t
+                # take logits and apply softmax 
+                prob_matrix[:,t] = torch.nn.functional.softmax(output_t, dim=1).cpu().numpy()
+            
+            # Run beam search to get the most likely sequence given the probability matrix
+            top_k = beam_search_class.search(prob_matrix)
+            best_sequence, best_score = max(top_k, key=lambda x: x[1])
+
+            # Get the predictions and targets for the final time step in the sequence
+            all_predictions.extend([best_sequence[-1]])
+            all_targets.extend(targets[:, -1].cpu().numpy())
+    # Check if there is a dimension mismatch between the predicted labels and the cursor data
+    if len(all_targets) != len(all_predictions):
+        print("Dimension mismatch between the predicted labels and the cursor data!")
+        print(f"Predicted labels: {len(all_predictions)} | Cursor data: {len(all_targets)}")
+        # Add padding to the predicted labels to match the length of the cursor data
+        all_predictions = np.vstack((np.zeros(len(all_targets)-len(all_predictions)),all_predictions))
+    
+    # Compute accuracy and detailed classification report
+    accuracy = accuracy_score(all_targets, all_predictions)
+    report = classification_report(all_targets, all_predictions, zero_division=0)
+
+    # Class 0: stationary, Class 1: 45 deg 1 pixel, Class 2: 45 deg 2 pixels, ..., Class 16: 315 deg 2 pixels
+    # test_init_idx = np.shape(cur_pos)[1]//2
+    # innitial_pos = cur_pos[:,test_init_idx]    
+    return accuracy, report, all_predictions, all_targets
+
+
 
 def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
     # Verify dimensions and add padding necessary to match the length of the cursor data
@@ -459,7 +512,7 @@ def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
             if label == 0:
                 trayectory[i,:] = trayectory[i-1,:]
             else:
-                trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction)),np.sin(np.deg2rad(direction))]*1e-3).T # 1e-3 is the time step
+                trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction))*1e-3,np.sin(np.deg2rad(direction))*1e-3]).T # 1e-3 is the time step
 
         # Calculate the trajectory R2 score
         ss_res = np.sum((trayectory - gt_pos) ** 2)  # Residual sum of squares

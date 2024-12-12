@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.nn import GRUCell, RNNCell
 from beam_serach import BeamSearch
+import torch.nn.functional as F
 
 """
 All models must meet a few requirements
@@ -49,7 +50,6 @@ class GRU_RNN(nn.Module):
 class GRU_RNN_StructPred(nn.Module):
     def __init__(self, latent_size, input_size=None, output_size=None, latent_ic_var=0.05):
         super().__init__()
-        # ANN Initialization
         self.input_size = input_size
         self.latent_size = latent_size
         self.output_size = output_size
@@ -57,7 +57,6 @@ class GRU_RNN_StructPred(nn.Module):
         self.readout = None
         self.latent_ics = torch.nn.Parameter(torch.zeros(latent_size), requires_grad=True)
         self.latent_ic_var = latent_ic_var
-
 
     def init_model(self, input_size, output_size):
         self.input_size = input_size
@@ -74,13 +73,34 @@ class GRU_RNN_StructPred(nn.Module):
         hidden = self.cell(inputs, hidden)
         output = self.readout(hidden)
         return output, hidden
-    
-    def struct_forward(self, inputs, hidden):
-        # ANN forward pass
-        output, hidden = self.forward(inputs, hidden)
-        # Beam search forward pass
 
-        return output, hidden
+    def struct_forward(self, current_input, hidden, device):
+        """
+        Processes a single timestep for beam search.
+
+        Args:
+            current_input (torch.Tensor): The input tensor for the current timestep (shape: (input_size,)).
+            hidden (torch.Tensor): The current hidden state (shape: (latent_size,)).
+            device (torch.device): Device for computation.
+
+        Returns:
+            List[tuple]: List of next states (labels) and their probabilities [(state, prob), ...].
+            torch.Tensor: Updated hidden state of the GRU.
+        """
+        # Ensure the input is on the correct device
+        current_input = current_input.unsqueeze(0).to(device)  # Shape: (1, input_size)
+
+        with torch.no_grad():
+            # Forward pass through the GRU for the current timestep
+            logits, next_hidden = self.forward(current_input, hidden)
+
+        # Compute probabilities using softmax
+        probabilities = torch.softmax(logits.squeeze(0), dim=0)  # Shape: (num_classes,)
+
+        # Generate state-probability pairs
+        next_states_probs = [(state, prob.item()) for state, prob in enumerate(probabilities)]
+
+        return next_states_probs, next_hidden
     
 
 class RecurrentDropout(nn.Module):

@@ -3,17 +3,16 @@ import heapq
 #TODO: - Modify constrains for BCI use case
 #      - Use class for structured inference, implement "structure forward pass" in model class
 
+
 class BeamSearch:
-    def __init__(self, sequence_model, beam_width, max_steps):
+    def __init__(self, beam_width, max_steps):
         """
         Initializes the BeamSearch class.
 
         Args:
-            sequence_model (function): Function to generate next states and probabilities.
             beam_width (int): Number of sequences to retain at each step.
             max_steps (int): Maximum number of steps to run the search.
         """
-        self.sequence_model = sequence_model
         self.beam_width = beam_width
         self.max_steps = max_steps
         self.constraints = []  # List of constraint functions
@@ -49,55 +48,48 @@ class BeamSearch:
         """
         return all(constraint(sequence) for constraint in self.constraints)
 
-    def search(self, start_state):
+    def search(self, prob_matrix):
         """
         Performs beam search.
 
         Args:
-            start_state (list): The initial state or token to start the search.
+            prob_matrix (np.ndarray): The 17x16 matrix representing the probabilities at each timestep.
 
         Returns:
             List[tuple]: The best sequences and their scores [(sequence, score), ...].
         """
-        beam = [(start_state, 1.0)]  # Initialize beam with the starting state
+        beam = [([], 1.0)]  # Initialize beam with the starting state (empty sequence, score = 1)
 
-        for _ in range(self.max_steps):
+        # Iterate through each timestep
+        for step in range(self.max_steps):
             all_candidates = []
 
             # Expand each sequence in the beam
             for sequence, score in beam:
-                next_states = self.sequence_model(sequence)
+                if step < prob_matrix.shape[1]:  # Ensure we don't exceed the matrix dimensions
+                    next_state_probs = prob_matrix[:, step]  # Probabilities for the current timestep
 
-                for next_state, prob in next_states:
-                    new_sequence = sequence + [next_state]
-                    new_score = score * prob
+                    # For each possible next state (label) at this step
+                    for next_state, prob in enumerate(next_state_probs):
+                        new_sequence = sequence + [next_state]
+                        new_score = score * prob
 
-                    # Apply constraints (if any)
-                    if not self.constraints or self.apply_constraints(new_sequence):
-                        if self.penalty_fn:
-                            penalty = self.penalty_fn(new_sequence)
-                            new_score *= penalty
-                        all_candidates.append((new_sequence, new_score))
+                        # Apply constraints (if any)
+                        if not self.constraints or self.apply_constraints(new_sequence):
+                            if self.penalty_fn:
+                                penalty = self.penalty_fn(self,new_sequence)
+                                new_score *= penalty
+                            all_candidates.append((new_sequence, new_score))
 
             # Keep the top `beam_width` sequences
             beam = heapq.nlargest(self.beam_width, all_candidates, key=lambda x: x[1])
 
-        return beam
+        # Return the top sequences and their scores
+        return [(seq, score) for seq, score in beam]
 
-    # # Max length constraint - Not sure it's needed
-    # def add_max_length_constraint(self, max_length):
-    #     """
-    #     Adds a constraint to limit the maximum length of sequences.
-
-    #     Args:
-    #         max_length (int): The maximum allowed sequence length.
-    #     """
-    #     self.add_constraint(lambda sequence: len(sequence) <= max_length)
-
-    # Non-repeating/consistency constraint
-    def non_repeating_penalty(sequence):
+    # Non-repeating/consistency penalty
+    def non_repeating_penalty(self, sequence):
         unique_values = len(set(sequence))
         total_values = len(sequence)
-        # Penalty: The more unique values, the higher the penalty
         penalty = 1.0 / (1.0 + unique_values / total_values)  # Scaled penalty
-        return penalty 
+        return penalty
