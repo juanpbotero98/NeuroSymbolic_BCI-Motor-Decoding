@@ -446,7 +446,7 @@ def evaluate_struct_model(model, data_loader, device, beam_search_class):
         for batch_id, (inputs, targets) in tqdm.tqdm(enumerate(data_loader)):
             input_size, seq_len, _ = inputs.size()
             # Probability matrix for the sequence
-            prob_matrix = np.zeros((17,seq_len))
+            score_matrix = np.zeros((17,seq_len))
 
             batch_size, seq_len, _ = inputs.size()
             inputs, targets = inputs.to(device), targets.to(device)
@@ -463,11 +463,12 @@ def evaluate_struct_model(model, data_loader, device, beam_search_class):
                 #     all_predictions.extend(output_t.cpu().numpy())
                 #     all_targets.extend(targets[:, t].cpu().numpy())
                 # probability for classes at time t
-                # take logits and apply softmax 
-                prob_matrix[:,t] = torch.nn.functional.softmax(output_t, dim=1).cpu().numpy()
+                # take logits and apply softmax --> Wrong approach the softmax normalizes the logits/scores but we dont want this 
+                # prob_matrix[:,t] = torch.nn.functional.softmax(output_t, dim=1).cpu().numpy()
+                score_matrix[:,t] = output_t.cpu().numpy()
             
             # Run beam search to get the most likely sequence given the probability matrix
-            top_k = beam_search_class.search(prob_matrix)
+            top_k = beam_search_class.search(score_matrix)
             best_sequence, best_score = max(top_k, key=lambda x: x[1])
 
             # Get the predictions and targets for the final time step in the sequence
@@ -515,9 +516,7 @@ def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
                 trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction))*1e-3,np.sin(np.deg2rad(direction))*1e-3]).T # 1e-3 is the time step
 
         # Calculate the trajectory R2 score
-        ss_res = np.sum((trayectory - gt_pos) ** 2)  # Residual sum of squares
-        ss_tot = np.sum((trayectory - np.mean(trayectory)) ** 2)  # Total sum of squares
-        r_squared = 1 - (ss_res / ss_tot)
+        rsquared = calculate_r2_score(trayectory, gt_pos)
     
     else: 
         # Calculate the trayectory
@@ -527,10 +526,16 @@ def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
             trayectory[i,:] = trayectory[i-1,:] + (pred_vel[i]*1e-3) # 1e-3 is the time step
 
         # Calculate the trajectory R2 score
-        ss_res = np.sum((trayectory - gt_pos) ** 2)  # Residual sum of squares
-        ss_tot = np.sum((trayectory - np.mean(trayectory)) ** 2)  # Total sum of squares
-        r_squared = 1 - (ss_res / ss_tot)
+        r_squared = calculate_r2_score(trayectory, gt_pos) 
     return trayectory, r_squared
+
+def calculate_r2_score(pred, gt):
+    # Assumes pred_var and gt_var are numpy arrays
+    ss_res = np.sum((gt - pred) ** 2,axis=0)
+    ss_tot = np.sum((gt - np.mean(gt)) ** 2,axis=0)
+    r_squared= 1 - (ss_res / ss_tot)
+    return r_squared
+
 
 
 # ------------ Plotting Functions -------------- #

@@ -61,15 +61,15 @@ def main(gpu=False):
     train_FR, val_FR, train_pos, val_pos = train_test_split(train_FR, train_pos, test_size=0.25, shuffle=False) # 75% train, 25% validation
 
     # Crop the first 3k samples from all data for short debugging
-    train_FR = train_FR[:3011]
-    train_labels = train_labels[:3011]
-    train_pos = train_pos[:3011]
-    val_FR = val_FR[:3011]
-    val_labels = val_labels[:3011]
-    val_pos = val_pos[:3011]
-    test_FR = test_FR[:3011]
-    test_labels = test_labels[:3011]
-    test_pos = test_pos[:3011]
+    # train_FR = train_FR[:3011]
+    # train_labels = train_labels[:3011]
+    # train_pos = train_pos[:3011]
+    # val_FR = val_FR[:3011]
+    # val_labels = val_labels[:3011]
+    # val_pos = val_pos[:3011]
+    # test_FR = test_FR[:3011]
+    # test_labels = test_labels[:3011]
+    # test_pos = test_pos[:3011]
 
     # Drop the last samples to make the data divisible by the sequence length 
     train_FR = train_FR[:-(train_FR.shape[0] % seq_len)]
