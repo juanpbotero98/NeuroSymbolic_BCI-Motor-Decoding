@@ -1,27 +1,0 @@
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/condabin/conda
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/bin/conda
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/bin/conda-env
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/bin/activate
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/bin/deactivate
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/etc/profile.d/conda.sh
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/etc/fish/conf.d/conda.fish
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/shell/condabin/Conda.psm1
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/shell/condabin/conda-hook.ps1
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/lib/python3.12/site-packages/xontrib/conda.xsh
-no change     /uufs/chpc.utah.edu/common/home/u1437983/software/pkg/miniforge3/etc/profile.d/conda.csh
-no change     /uufs/chpc.utah.edu/common/home/u1437983/.bashrc
-No action taken.
-/uufs/chpc.utah.edu/common/home/u1437983/Documents/NDA_Projects/NeuroSymbolic_BCI-Motor-Decoding/evaluate_GRU_RNN_Regressor.py:36: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
-  checkpoint = torch.load(trained_model_path,map_location=device)
-Using device: NVIDIA GeForce RTX 3090
-TRAINING: FR shape= torch.Size([192, 3000]) | GT shape= torch.Size([2, 3000]) | Position shape= (3000, 2)
-VALIDATION: FR shape= torch.Size([192, 3000]) | GT shape= torch.Size([2, 3000]) | Position shape= (3000, 2)
-TEST: FR shape= torch.Size([192, 3000]) | GT shape= torch.Size([2, 3000]) | Position shape= (3000, 2)
-0it [00:00, ?it/s]1it [00:00,  6.89it/s]2it [00:00,  8.37it/s]3it [00:00,  8.95it/s]4it [00:00,  9.27it/s]5it [00:00,  9.50it/s]6it [00:00,  9.65it/s]7it [00:00,  9.74it/s]8it [00:00,  9.81it/s]9it [00:00,  9.83it/s]10it [00:01,  9.83it/s]11it [00:01,  9.83it/s]12it [00:01,  9.82it/s]13it [00:01,  9.84it/s]14it [00:01,  9.83it/s]15it [00:01,  9.85it/s]16it [00:01,  9.82it/s]17it [00:01,  9.83it/s]18it [00:01,  9.85it/s]19it [00:01,  9.85it/s]20it [00:02,  9.82it/s]21it [00:02,  9.83it/s]22it [00:02,  9.83it/s]23it [00:02,  9.87it/s]24it [00:02,  9.86it/s]25it [00:02,  9.82it/s]26it [00:02,  9.80it/s]27it [00:02,  9.78it/s]28it [00:02,  9.75it/s]29it [00:02,  9.77it/s]30it [00:03,  9.80it/s]31it [00:03,  9.86it/s]32it [00:03,  9.87it/s]33it [00:03,  9.84it/s]34it [00:03,  9.86it/s]35it [00:03,  9.88it/s]36it [00:03,  9.85it/s]37it [00:03,  9.85it/s]38it [00:03,  9.86it/s]40it [00:04,  9.91it/s]41it [00:04,  9.88it/s]42it [00:04,  9.89it/s]43it [00:04,  9.88it/s]44it [00:04,  9.88it/s]45it [00:04,  9.87it/s]46it [00:04,  9.85it/s]47it [00:04,  9.88it/s]48it [00:04,  9.90it/s]49it [00:05,  9.89it/s]50it [00:05,  9.87it/s]51it [00:05,  9.86it/s]52it [00:05,  9.88it/s]53it [00:05,  9.91it/s]54it [00:05,  9.92it/s]55it [00:05,  9.90it/s]56it [00:05,  9.89it/s]57it [00:05,  9.89it/s]58it [00:05,  9.90it/s]59it [00:06,  9.88it/s]60it [00:06,  9.88it/s]61it [00:06,  9.89it/s]62it [00:06,  9.89it/s]63it [00:06,  9.90it/s]63it [00:06,  9.80it/s]
-Phase: train | R-squared: -0.4138075810869548
-Traceback (most recent call last):
-  File "/uufs/chpc.utah.edu/common/home/u1437983/Documents/NDA_Projects/NeuroSymbolic_BCI-Motor-Decoding/evaluate_GRU_RNN_Regressor.py", line 175, in <module>
-    main(args.model_name, args.gpu, args.decoded_var)
-  File "/uufs/chpc.utah.edu/common/home/u1437983/Documents/NDA_Projects/NeuroSymbolic_BCI-Motor-Decoding/evaluate_GRU_RNN_Regressor.py", line 140, in main
-    all_trayectory_X.extend(trayectory_phase[:,0])
-TypeError: string indices must be integers
