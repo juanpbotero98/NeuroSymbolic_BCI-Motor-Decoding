@@ -47,7 +47,9 @@
   ```
   Useful commands: 
     - scontrol show job <job ID>
-    - squeue -u u1437983
+    - squeue -u u1437983 or squeue -me
+    - scancel <job ID>
+    - sinfo -p <partition name (i.e., notchpeak-shared)>
 
 
 ### Further CHCP Resources: 

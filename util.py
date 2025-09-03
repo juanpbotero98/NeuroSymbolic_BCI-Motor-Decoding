@@ -1,5 +1,5 @@
 ## Authors: Madeleine Bartlett, 
-from pynwb import NWBHDF5IO
+# from pynwb import NWBHDF5IO
 import numpy as np
 import sparse
 from scipy import interpolate
@@ -14,6 +14,7 @@ import torch
 from sklearn.metrics import accuracy_score, classification_report
 import tqdm
 from beam_serach import BeamSearch
+import os 
 # ------------ Data Handling Functions -------------- #
 def get_data(inputfile):
     """
@@ -513,7 +514,7 @@ def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
             if label == 0:
                 trayectory[i,:] = trayectory[i-1,:]
             else:
-                trayectory[i,:] = trayectory[i-1,:] + speed*np.array([np.cos(np.deg2rad(direction))*1e-3,np.sin(np.deg2rad(direction))*1e-3]).T # 1e-3 is the time step
+                trayectory[i,:] = trayectory[i-1,:] + (speed*1e-3)*np.array([np.cos(np.deg2rad(direction)),np.sin(np.deg2rad(direction))]).T # 1e-3 is the time step
 
         # Calculate the trajectory R2 score
         rsquared = calculate_r2_score(trayectory, gt_pos)
@@ -526,13 +527,14 @@ def calculate_trayectory(pred_vel, gt_pos, discrete_output=False):
             trayectory[i,:] = trayectory[i-1,:] + (pred_vel[i]*1e-3) # 1e-3 is the time step
 
         # Calculate the trajectory R2 score
-        r_squared = calculate_r2_score(trayectory, gt_pos) 
-    return trayectory, r_squared
+        rsquared = calculate_r2_score(trayectory, gt_pos) 
+    return trayectory, rsquared
 
 def calculate_r2_score(pred, gt):
     # Assumes pred_var and gt_var are numpy arrays
+    gt_mean = np.mean(gt,axis=0)
     ss_res = np.sum((gt - pred) ** 2,axis=0)
-    ss_tot = np.sum((gt - np.mean(gt)) ** 2,axis=0)
+    ss_tot = np.sum((gt - gt_mean) ** 2,axis=0)
     r_squared= 1 - (ss_res / ss_tot)
     return r_squared
 
@@ -644,8 +646,10 @@ if __name__ == "__main__":
     # curs_list, spike_list, targetind = get_data(inputfile)
 
     # Test BIOCAS data loading function
-    inputfile = "Dataset\\NHP Reaching Sensorimotor Ephys\\indy_20160407_02.mat"
+    inputfile = os.path.join(os.getcwd(),'Dataset','indy_20160407_02.mat')
     cursor_pos, spike_data, vel = get_data_BIOCAS(inputfile, discretize_output=True)
 
+    # Test trayectory calculation
+    trayectory,r2 = calculate_trayectory(vel,cursor_pos.T,discrete_output=True)
     print("Data loaded successfully!")
     

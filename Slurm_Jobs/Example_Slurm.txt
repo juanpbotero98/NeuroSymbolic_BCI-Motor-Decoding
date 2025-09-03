@@ -1,11 +1,15 @@
 #!/bin/bash
 #SBATCH --account=baggins
 #SBATCH --partition=lonepeak
+#SBATCH --qos=lonepeak-guest
 #SBATCH --time=02:00:00
-#SBATCH --ntasks=8
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH -o slurmjob-%j.out-%N
 #SBATCH -e slurmjob-%j.err-%N
+#SBATCH --mail-type=FAIL,BEGIN,END
+#SBATCH --mail-user=u1437983@utah.edu
 
 #set up scratch directory
 SCRDIR=/scratch/general/vast/$USER/$SLURM_JOB_ID
